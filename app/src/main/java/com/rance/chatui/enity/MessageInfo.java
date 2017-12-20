@@ -20,11 +20,12 @@ public class MessageInfo {
     private String header;
     private String imageUrl;
     private long voiceTime;
+    private int sender, receiver;
 
-    @Generated(hash = 885927396)
+    @Generated(hash = 2106525526)
     public MessageInfo(String id, int type, String content, String filepath,
                        int sendState, long time, String header, String imageUrl,
-                       long voiceTime) {
+                       long voiceTime, int sender, int receiver) {
         this.id = id;
         this.type = type;
         this.content = content;
@@ -34,6 +35,8 @@ public class MessageInfo {
         this.header = header;
         this.imageUrl = imageUrl;
         this.voiceTime = voiceTime;
+        this.sender = sender;
+        this.receiver = receiver;
     }
 
     @Generated(hash = 1292770546)
@@ -106,7 +109,7 @@ public class MessageInfo {
 
     public String getId() {
         if (id == null) {
-            id = String.valueOf(toString().hashCode());
+            id = String.format("%d:%d-%d", time, sender, receiver);
         }
         return id;
     }
@@ -128,5 +131,21 @@ public class MessageInfo {
                 ", voiceTime=" + voiceTime +
                 ", id='" + id + '\'' +
                 '}';
+    }
+
+    public int getSender() {
+        return this.sender;
+    }
+
+    public void setSender(int sender) {
+        this.sender = sender;
+    }
+
+    public int getReceiver() {
+        return this.receiver;
+    }
+
+    public void setReceiver(int receiver) {
+        this.receiver = receiver;
     }
 }
