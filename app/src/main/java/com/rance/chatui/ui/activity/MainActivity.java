@@ -5,12 +5,14 @@ import android.graphics.drawable.AnimationDrawable;
 import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.os.Handler;
+import android.support.annotation.NonNull;
 import android.support.v4.app.Fragment;
-import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.RelativeLayout;
@@ -18,6 +20,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.jude.easyrecyclerview.EasyRecyclerView;
+import com.jude.easyrecyclerview.adapter.RecyclerArrayAdapter;
 import com.rance.chatui.R;
 import com.rance.chatui.adapter.ChatAdapter;
 import com.rance.chatui.adapter.CommonFragmentPagerAdapter;
@@ -40,6 +43,7 @@ import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import butterknife.BindView;
@@ -60,6 +64,8 @@ public class MainActivity extends AppCompatActivity {
     EditText editText;
     @BindView(R.id.voice_text)
     TextView voiceText;
+
+    View loadView;
     @BindView(R.id.emotion_button)
     ImageView emotionButton;
     @BindView(R.id.emotion_add)
@@ -82,6 +88,7 @@ public class MainActivity extends AppCompatActivity {
     AnimationDrawable animationDrawable = null;
     private ImageView animView;
     Unbinder unbinder;
+    Handler handler;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -89,6 +96,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         unbinder = ButterKnife.bind(this);
         EventBus.getDefault().register(this);
+        handler = new Handler();
         initWidget();
     }
 
@@ -118,7 +126,21 @@ public class MainActivity extends AppCompatActivity {
         globalOnItemClickListener.attachToEditText(editText);
 
         chatAdapter = new ChatAdapter(this);
-        LinearLayoutManager layoutManager = new LinearLayoutManager(this);
+        chatAdapter.addHeader(new RecyclerArrayAdapter.ItemView() {
+            @Override
+            public View onCreateView(ViewGroup parent) {
+                View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.loading_chat_history_layout, parent, false);
+                loadView = view.findViewById(R.id.content);
+                loadView.setVisibility(View.GONE);
+                return view;
+            }
+
+            @Override
+            public void onBindView(View headerView) {
+
+            }
+        });
+        final LinearLayoutManager layoutManager = new LinearLayoutManager(this);
         layoutManager.setOrientation(LinearLayoutManager.VERTICAL);
         chatList.setLayoutManager(layoutManager);
         chatList.setAdapter(chatAdapter);
@@ -127,6 +149,10 @@ public class MainActivity extends AppCompatActivity {
             public void onScrollStateChanged(RecyclerView recyclerView, int newState) {
                 switch (newState) {
                     case RecyclerView.SCROLL_STATE_IDLE:
+                        int position = layoutManager.findFirstCompletelyVisibleItemPosition();
+                        if (position == 0 && loadView.getVisibility() == View.GONE) {
+                            onLoadingHistory();
+                        }
                         chatAdapter.handler.removeCallbacksAndMessages(null);
                         chatAdapter.notifyDataSetChanged();
                         break;
@@ -149,17 +175,26 @@ public class MainActivity extends AppCompatActivity {
         chatAdapter.addAll(loadData());
         scrollToBottom();
         initAutoScroll();
-        chatList.setRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
-            @Override
-            public void onRefresh() {
-                new Handler().postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        chatList.setRefreshing(false);
-                    }
-                }, 2000);
-            }
-        });
+    }
+
+    void onLoadingHistory() {
+        if (loadView.isEnabled()) {
+            loadView.setVisibility(View.VISIBLE);
+            handler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    List<MessageInfo> list = getHistory();
+                    if (!list.isEmpty()) {
+                        chatAdapter.insertAll(list, 0);
+                    } else loadView.setEnabled(false);
+                    finishLoadHistory();
+                }
+            }, 1500);
+        }
+    }
+
+    void finishLoadHistory() {
+        loadView.setVisibility(View.GONE);
     }
 
     void initAutoScroll() {
@@ -235,11 +270,18 @@ public class MainActivity extends AppCompatActivity {
         DaoMaster master = new DaoMaster(dbHelper.getWritableDatabase());
         session = master.newSession();
         dao = session.getMessageInfoDao();
-        List<MessageInfo> list = dao.loadAll();
-        if (list == null || list.isEmpty()) {
+        List<MessageInfo> list = getHistory();
+        if (list.isEmpty()) {
             list = createData();
             dao.insertOrReplaceInTx(list);
         }
+        return list;
+    }
+
+    @NonNull
+    List<MessageInfo> getHistory() {
+        List<MessageInfo> list = dao.queryBuilder().orderDesc(MessageInfoDao.Properties.Time).offset(chatAdapter.getCount()).limit(5).list();
+        Collections.reverse(list);
         return list;
     }
 
@@ -249,32 +291,35 @@ public class MainActivity extends AppCompatActivity {
     private List<MessageInfo> createData() {
         List<MessageInfo> messageInfos = new ArrayList<>();
 
-        MessageInfo messageInfo = new MessageInfo();
-        messageInfo.setContent("你好，欢迎使用Rance的聊天界面框架");
-        messageInfo.setType(Constants.CHAT_ITEM_TYPE_LEFT);
-        messageInfo.setHeader("http://tupian.enterdesk.com/2014/mxy/11/2/1/12.jpg");
-        messageInfos.add(messageInfo);
+        MessageInfo msg = new MessageInfo();
+        msg.setContent("你好，欢迎使用Rance的聊天界面框架");
+        msg.setType(Constants.CHAT_ITEM_TYPE_LEFT);
+        msg.setHeader("http://tupian.enterdesk.com/2014/mxy/11/2/1/12.jpg");
+        messageInfos.add(msg);
 
-        MessageInfo messageInfo1 = new MessageInfo();
-        messageInfo1.setFilepath("http://www.trueme.net/bb_midi/welcome.wav");
-        messageInfo1.setVoiceTime(3000);
-        messageInfo1.setType(Constants.CHAT_ITEM_TYPE_RIGHT);
-        messageInfo1.setSendState(Constants.CHAT_ITEM_SEND_SUCCESS);
-        messageInfo1.setHeader("http://img.dongqiudi.com/uploads/avatar/2014/10/20/8MCTb0WBFG_thumb_1413805282863.jpg");
-        messageInfos.add(messageInfo1);
+        msg = new MessageInfo();
+        msg.setFilepath("http://www.trueme.net/bb_midi/welcome.wav");
+        msg.setVoiceTime(3000);
+        msg.setType(Constants.CHAT_ITEM_TYPE_RIGHT);
+        msg.setSendState(Constants.CHAT_ITEM_SEND_SUCCESS);
+        msg.setHeader("http://img.dongqiudi.com/uploads/avatar/2014/10/20/8MCTb0WBFG_thumb_1413805282863.jpg");
+        messageInfos.add(msg);
 
-        MessageInfo messageInfo2 = new MessageInfo();
-        messageInfo2.setImageUrl("http://img4.imgtn.bdimg.com/it/u=1800788429,176707229&fm=21&gp=0.jpg");
-        messageInfo2.setType(Constants.CHAT_ITEM_TYPE_LEFT);
-        messageInfo2.setHeader("http://tupian.enterdesk.com/2014/mxy/11/2/1/12.jpg");
-        messageInfos.add(messageInfo2);
+        msg = new MessageInfo();
+        msg.setImageUrl("http://img4.imgtn.bdimg.com/it/u=1800788429,176707229&fm=21&gp=0.jpg");
+        msg.setType(Constants.CHAT_ITEM_TYPE_LEFT);
+        msg.setHeader("http://tupian.enterdesk.com/2014/mxy/11/2/1/12.jpg");
+        messageInfos.add(msg);
 
-        MessageInfo messageInfo3 = new MessageInfo();
-        messageInfo3.setContent("[微笑][色][色][色]");
-        messageInfo3.setType(Constants.CHAT_ITEM_TYPE_RIGHT);
-        messageInfo3.setSendState(Constants.CHAT_ITEM_SEND_ERROR);
-        messageInfo3.setHeader("http://img.dongqiudi.com/uploads/avatar/2014/10/20/8MCTb0WBFG_thumb_1413805282863.jpg");
-        messageInfos.add(messageInfo3);
+        msg = new MessageInfo();
+        msg.setContent("[微笑][色][色][色]");
+        msg.setType(Constants.CHAT_ITEM_TYPE_RIGHT);
+        msg.setSendState(Constants.CHAT_ITEM_SEND_ERROR);
+        msg.setHeader("http://img.dongqiudi.com/uploads/avatar/2014/10/20/8MCTb0WBFG_thumb_1413805282863.jpg");
+        messageInfos.add(msg);
+        for (int i = 0; i < messageInfos.size(); i++) {
+            messageInfos.get(i).setTime(System.currentTimeMillis() + i);
+        }
         return messageInfos;
     }
 
@@ -296,10 +341,10 @@ public class MainActivity extends AppCompatActivity {
         new Handler().postDelayed(new Runnable() {
             public void run() {
                 MessageInfo message = new MessageInfo();
+                message.setTime(System.currentTimeMillis());
                 message.setContent("这是模拟消息回复");
                 message.setType(Constants.CHAT_ITEM_TYPE_LEFT);
                 message.setHeader("http://tupian.enterdesk.com/2014/mxy/11/2/1/12.jpg");
-                message.setTime(System.currentTimeMillis());
                 addMessage(message);
                 scrollToBottom();
                 dao.insertOrReplace(message);
@@ -312,7 +357,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void scrollToBottom() {
-        chatList.scrollToPosition(chatAdapter.getCount() - 1);
+        chatList.scrollToPosition(chatAdapter.getCount() + chatAdapter.getHeaderCount() - 1);
     }
 
     @Override

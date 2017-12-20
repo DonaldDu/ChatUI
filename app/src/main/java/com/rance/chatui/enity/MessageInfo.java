@@ -23,8 +23,8 @@ public class MessageInfo {
 
     @Generated(hash = 885927396)
     public MessageInfo(String id, int type, String content, String filepath,
-            int sendState, long time, String header, String imageUrl,
-            long voiceTime) {
+                       int sendState, long time, String header, String imageUrl,
+                       long voiceTime) {
         this.id = id;
         this.type = type;
         this.content = content;
