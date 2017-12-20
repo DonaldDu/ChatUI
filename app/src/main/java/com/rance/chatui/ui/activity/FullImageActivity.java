@@ -10,7 +10,6 @@ import android.os.Build;
 import android.os.Bundle;
 import android.view.ViewTreeObserver;
 import android.view.Window;
-import android.view.WindowManager;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -23,7 +22,7 @@ import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 
-import butterknife.Bind;
+import butterknife.BindView;
 import butterknife.ButterKnife;
 import butterknife.OnClick;
 
@@ -33,9 +32,9 @@ import butterknife.OnClick;
  */
 public class FullImageActivity extends Activity {
 
-    @Bind(R.id.full_image)
+    @BindView(R.id.full_image)
     ImageView fullImage;
-    @Bind(R.id.full_lay)
+    @BindView(R.id.full_lay)
     LinearLayout fullLay;
     private int mLeft;
     private int mTop;

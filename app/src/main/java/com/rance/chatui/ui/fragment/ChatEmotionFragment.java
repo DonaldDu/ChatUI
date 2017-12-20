@@ -14,15 +14,15 @@ import com.rance.chatui.adapter.EmotionGridViewAdapter;
 import com.rance.chatui.adapter.EmotionPagerAdapter;
 import com.rance.chatui.base.BaseFragment;
 import com.rance.chatui.base.MyApplication;
-import com.rance.chatui.util.Utils;
 import com.rance.chatui.util.EmotionUtils;
 import com.rance.chatui.util.GlobalOnItemClickManagerUtils;
+import com.rance.chatui.util.Utils;
 import com.rance.chatui.widget.IndicatorView;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import butterknife.Bind;
+import butterknife.BindView;
 import butterknife.ButterKnife;
 
 /**
@@ -30,9 +30,9 @@ import butterknife.ButterKnife;
  * 邮箱：rance935@163.com
  */
 public class ChatEmotionFragment extends BaseFragment {
-    @Bind(R.id.fragment_chat_vp)
+    @BindView(R.id.fragment_chat_vp)
     ViewPager fragmentChatVp;
-    @Bind(R.id.fragment_chat_group)
+    @BindView(R.id.fragment_chat_group)
     IndicatorView fragmentChatGroup;
     private View rootView;
     private EmotionPagerAdapter emotionPagerAdapter;

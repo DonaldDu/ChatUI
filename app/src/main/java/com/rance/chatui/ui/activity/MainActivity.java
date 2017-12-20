@@ -6,6 +6,7 @@ import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.os.Handler;
 import android.support.v4.app.Fragment;
+import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
@@ -20,8 +21,11 @@ import com.jude.easyrecyclerview.EasyRecyclerView;
 import com.rance.chatui.R;
 import com.rance.chatui.adapter.ChatAdapter;
 import com.rance.chatui.adapter.CommonFragmentPagerAdapter;
+import com.rance.chatui.enity.DaoMaster;
+import com.rance.chatui.enity.DaoSession;
 import com.rance.chatui.enity.FullImageInfo;
 import com.rance.chatui.enity.MessageInfo;
+import com.rance.chatui.enity.MessageInfoDao;
 import com.rance.chatui.ui.fragment.ChatEmotionFragment;
 import com.rance.chatui.ui.fragment.ChatFunctionFragment;
 import com.rance.chatui.util.Constants;
@@ -38,8 +42,9 @@ import org.greenrobot.eventbus.ThreadMode;
 import java.util.ArrayList;
 import java.util.List;
 
-import butterknife.Bind;
+import butterknife.BindView;
 import butterknife.ButterKnife;
+import butterknife.Unbinder;
 
 /**
  * 作者：Rance on 2016/11/29 10:47
@@ -47,56 +52,53 @@ import butterknife.ButterKnife;
  */
 public class MainActivity extends AppCompatActivity {
 
-    @Bind(R.id.chat_list)
+    @BindView(R.id.chat_list)
     EasyRecyclerView chatList;
-    @Bind(R.id.emotion_voice)
+    @BindView(R.id.emotion_voice)
     ImageView emotionVoice;
-    @Bind(R.id.edit_text)
+    @BindView(R.id.edit_text)
     EditText editText;
-    @Bind(R.id.voice_text)
+    @BindView(R.id.voice_text)
     TextView voiceText;
-    @Bind(R.id.emotion_button)
+    @BindView(R.id.emotion_button)
     ImageView emotionButton;
-    @Bind(R.id.emotion_add)
+    @BindView(R.id.emotion_add)
     ImageView emotionAdd;
-    @Bind(R.id.emotion_send)
+    @BindView(R.id.emotion_send)
     StateButton emotionSend;
-    @Bind(R.id.viewpager)
+    @BindView(R.id.viewpager)
     NoScrollViewPager viewpager;
-    @Bind(R.id.emotion_layout)
+    @BindView(R.id.emotion_layout)
     RelativeLayout emotionLayout;
+    @BindView(R.id.rootLayout)
+    View rootLayout;
 
     private EmotionInputDetector mDetector;
-    private ArrayList<Fragment> fragments;
-    private ChatEmotionFragment chatEmotionFragment;
-    private ChatFunctionFragment chatFunctionFragment;
-    private CommonFragmentPagerAdapter adapter;
 
     private ChatAdapter chatAdapter;
-    private LinearLayoutManager layoutManager;
-    private List<MessageInfo> messageInfos;
     //录音相关
     int animationRes = 0;
     int res = 0;
     AnimationDrawable animationDrawable = null;
     private ImageView animView;
+    Unbinder unbinder;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        ButterKnife.bind(this);
+        unbinder = ButterKnife.bind(this);
         EventBus.getDefault().register(this);
         initWidget();
     }
 
     private void initWidget() {
-        fragments = new ArrayList<>();
-        chatEmotionFragment = new ChatEmotionFragment();
+        List<Fragment> fragments = new ArrayList<>();
+        ChatEmotionFragment chatEmotionFragment = new ChatEmotionFragment();
         fragments.add(chatEmotionFragment);
-        chatFunctionFragment = new ChatFunctionFragment();
+        ChatFunctionFragment chatFunctionFragment = new ChatFunctionFragment();
         fragments.add(chatFunctionFragment);
-        adapter = new CommonFragmentPagerAdapter(getSupportFragmentManager(), fragments);
+        CommonFragmentPagerAdapter adapter = new CommonFragmentPagerAdapter(getSupportFragmentManager(), fragments);
         viewpager.setAdapter(adapter);
         viewpager.setCurrentItem(0);
 
@@ -116,7 +118,7 @@ public class MainActivity extends AppCompatActivity {
         globalOnItemClickListener.attachToEditText(editText);
 
         chatAdapter = new ChatAdapter(this);
-        layoutManager = new LinearLayoutManager(this);
+        LinearLayoutManager layoutManager = new LinearLayoutManager(this);
         layoutManager.setOrientation(LinearLayoutManager.VERTICAL);
         chatList.setLayoutManager(layoutManager);
         chatList.setAdapter(chatAdapter);
@@ -144,7 +146,29 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         chatAdapter.addItemClickListener(itemClickListener);
-        LoadData();
+        chatAdapter.addAll(loadData());
+        scrollToBottom();
+        initAutoScroll();
+        chatList.setRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
+            @Override
+            public void onRefresh() {
+                new Handler().postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        chatList.setRefreshing(false);
+                    }
+                }, 2000);
+            }
+        });
+    }
+
+    void initAutoScroll() {
+        rootLayout.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+            @Override
+            public void onLayoutChange(View v, int left, int top, int right, int bottom, int oldLeft, int oldTop, int oldRight, int oldBottom) {
+                if (oldBottom > bottom) scrollToBottom();
+            }
+        });
     }
 
     /**
@@ -165,24 +189,27 @@ public class MainActivity extends AppCompatActivity {
             fullImageInfo.setLocationY(location[1]);
             fullImageInfo.setWidth(view.getWidth());
             fullImageInfo.setHeight(view.getHeight());
-            fullImageInfo.setImageUrl(messageInfos.get(position).getImageUrl());
+            fullImageInfo.setImageUrl(chatAdapter.getItem(position).getImageUrl());
             EventBus.getDefault().postSticky(fullImageInfo);
             startActivity(new Intent(MainActivity.this, FullImageActivity.class));
             overridePendingTransition(0, 0);
         }
 
+        /**
+         * TODO:如果是WIFI收到信息时自动下载，流量则点击播放时才下载语音文件，多次播放不会额外开销流量。
+         * */
         @Override
         public void onVoiceClick(final ImageView imageView, final int position) {
             if (animView != null) {
                 animView.setImageResource(res);
                 animView = null;
             }
-            switch (messageInfos.get(position).getType()) {
-                case 1:
+            switch (chatAdapter.getItem(position).getType()) {
+                case Constants.CHAT_ITEM_TYPE_LEFT:
                     animationRes = R.drawable.voice_left;
                     res = R.mipmap.icon_voice_left3;
                     break;
-                case 2:
+                case Constants.CHAT_ITEM_TYPE_RIGHT:
                     animationRes = R.drawable.voice_right;
                     res = R.mipmap.icon_voice_right3;
                     break;
@@ -191,7 +218,7 @@ public class MainActivity extends AppCompatActivity {
             animView.setImageResource(animationRes);
             animationDrawable = (AnimationDrawable) imageView.getDrawable();
             animationDrawable.start();
-            MediaManager.playSound(messageInfos.get(position).getFilepath(), new MediaPlayer.OnCompletionListener() {
+            MediaManager.playSound(chatAdapter.getItem(position).getFilepath(), new MediaPlayer.OnCompletionListener() {
                 @Override
                 public void onCompletion(MediaPlayer mp) {
                     animView.setImageResource(res);
@@ -199,12 +226,28 @@ public class MainActivity extends AppCompatActivity {
             });
         }
     };
+    MessageInfoDao dao;
+    DaoMaster.DevOpenHelper dbHelper;
+    DaoSession session;
+
+    List<MessageInfo> loadData() {
+        dbHelper = new DaoMaster.DevOpenHelper(this, "db");
+        DaoMaster master = new DaoMaster(dbHelper.getWritableDatabase());
+        session = master.newSession();
+        dao = session.getMessageInfoDao();
+        List<MessageInfo> list = dao.loadAll();
+        if (list == null || list.isEmpty()) {
+            list = createData();
+            dao.insertOrReplaceInTx(list);
+        }
+        return list;
+    }
 
     /**
      * 构造聊天数据
      */
-    private void LoadData() {
-        messageInfos = new ArrayList<>();
+    private List<MessageInfo> createData() {
+        List<MessageInfo> messageInfos = new ArrayList<>();
 
         MessageInfo messageInfo = new MessageInfo();
         messageInfo.setContent("你好，欢迎使用Rance的聊天界面框架");
@@ -232,8 +275,7 @@ public class MainActivity extends AppCompatActivity {
         messageInfo3.setSendState(Constants.CHAT_ITEM_SEND_ERROR);
         messageInfo3.setHeader("http://img.dongqiudi.com/uploads/avatar/2014/10/20/8MCTb0WBFG_thumb_1413805282863.jpg");
         messageInfos.add(messageInfo3);
-
-        chatAdapter.addAll(messageInfos);
+        return messageInfos;
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
@@ -241,12 +283,13 @@ public class MainActivity extends AppCompatActivity {
         messageInfo.setHeader("http://img.dongqiudi.com/uploads/avatar/2014/10/20/8MCTb0WBFG_thumb_1413805282863.jpg");
         messageInfo.setType(Constants.CHAT_ITEM_TYPE_RIGHT);
         messageInfo.setSendState(Constants.CHAT_ITEM_SENDING);
-        messageInfos.add(messageInfo);
-        chatAdapter.add(messageInfo);
-        chatList.scrollToPosition(chatAdapter.getCount() - 1);
+        messageInfo.setTime(System.currentTimeMillis());
+        addMessage(messageInfo);
+        scrollToBottom();
         new Handler().postDelayed(new Runnable() {
             public void run() {
                 messageInfo.setSendState(Constants.CHAT_ITEM_SEND_SUCCESS);
+                dao.insertOrReplace(messageInfo);
                 chatAdapter.notifyDataSetChanged();
             }
         }, 2000);
@@ -256,11 +299,20 @@ public class MainActivity extends AppCompatActivity {
                 message.setContent("这是模拟消息回复");
                 message.setType(Constants.CHAT_ITEM_TYPE_LEFT);
                 message.setHeader("http://tupian.enterdesk.com/2014/mxy/11/2/1/12.jpg");
-                messageInfos.add(message);
-                chatAdapter.add(message);
-                chatList.scrollToPosition(chatAdapter.getCount() - 1);
+                message.setTime(System.currentTimeMillis());
+                addMessage(message);
+                scrollToBottom();
+                dao.insertOrReplace(message);
             }
         }, 3000);
+    }
+
+    private void addMessage(MessageInfo message) {
+        chatAdapter.add(message);
+    }
+
+    private void scrollToBottom() {
+        chatList.scrollToPosition(chatAdapter.getCount() - 1);
     }
 
     @Override
@@ -273,7 +325,10 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        ButterKnife.unbind(this);
+        unbinder.unbind();
+        session.clear();
+        dbHelper.close();
+
         EventBus.getDefault().removeStickyEvent(this);
         EventBus.getDefault().unregister(this);
     }

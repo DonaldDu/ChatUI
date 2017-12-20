@@ -9,6 +9,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
+import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
@@ -39,7 +40,6 @@ public class ChatFunctionFragment extends BaseFragment {
     private static final int REQUEST_CODE_PICK_IMAGE = 3;
     private static final int MY_PERMISSIONS_REQUEST_CALL_PHONE = 6;
     private static final int MY_PERMISSIONS_REQUEST_CALL_PHONE2 = 7;
-    private File output;
     private Uri imageUri;
 
     @Nullable
@@ -86,21 +86,15 @@ public class ChatFunctionFragment extends BaseFragment {
      * 拍照
      */
     private void takePhoto() {
-        /**
-         * 最后一个参数是文件夹的名称，可以随便起
-         */
+        //最后一个参数是文件夹的名称，可以随便起
         File file = new File(Environment.getExternalStorageDirectory(), "拍照");
         if (!file.exists()) {
             file.mkdir();
         }
-        /**
-         * 这里将时间作为不同照片的名称
-         */
-        output = new File(file, System.currentTimeMillis() + ".jpg");
+        //这里将时间作为不同照片的名称
+        File output = new File(file, System.currentTimeMillis() + ".jpg");
 
-        /**
-         * 如果该文件夹已经存在，则删除它，否则创建一个
-         */
+        //如果该文件夹已经存在，则删除它，否则创建一个
         try {
             if (output.exists()) {
                 output.delete();
@@ -109,27 +103,20 @@ public class ChatFunctionFragment extends BaseFragment {
         } catch (Exception e) {
             e.printStackTrace();
         }
-        /**
-         * 隐式打开拍照的Activity，并且传入CROP_PHOTO常量作为拍照结束后回调的标志
-         */
+        //隐式打开拍照的Activity，并且传入CROP_PHOTO常量作为拍照结束后回调的标志
         imageUri = Uri.fromFile(output);
         Intent intent = new Intent("android.media.action.IMAGE_CAPTURE");
         intent.putExtra(MediaStore.EXTRA_OUTPUT, imageUri);
         startActivityForResult(intent, CROP_PHOTO);
-
     }
 
     /**
      * 从相册选取图片
      */
     private void choosePhoto() {
-        /**
-         * 打开选择图片的界面
-         */
         Intent intent = new Intent(Intent.ACTION_PICK);
         intent.setType("image/*");//相片类型
         startActivityForResult(intent, REQUEST_CODE_PICK_IMAGE);
-
     }
 
     public void onActivityResult(int req, int res, Intent data) {
@@ -140,7 +127,7 @@ public class ChatFunctionFragment extends BaseFragment {
                         MessageInfo messageInfo = new MessageInfo();
                         messageInfo.setImageUrl(imageUri.getPath());
                         EventBus.getDefault().post(messageInfo);
-                    } catch (Exception e) {
+                    } catch (Exception ignored) {
                     }
                 } else {
                     Log.d(Constants.TAG, "失败");
@@ -170,8 +157,7 @@ public class ChatFunctionFragment extends BaseFragment {
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         if (requestCode == MY_PERMISSIONS_REQUEST_CALL_PHONE) {
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 takePhoto();
@@ -192,13 +178,13 @@ public class ChatFunctionFragment extends BaseFragment {
 
     public String getRealPathFromURI(Uri contentUri) {
         String res = null;
-        String[] proj = { MediaStore.Images.Media.DATA };
+        String[] proj = {MediaStore.Images.Media.DATA};
         Cursor cursor = getActivity().getContentResolver().query(contentUri, proj, null, null, null);
-        if(cursor.moveToFirst()){;
+        if (cursor != null && cursor.moveToFirst()) {
             int column_index = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA);
             res = cursor.getString(column_index);
+            cursor.close();
         }
-        cursor.close();
         return res;
     }
 }

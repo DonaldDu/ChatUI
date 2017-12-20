@@ -1,19 +1,44 @@
 package com.rance.chatui.enity;
 
+import org.greenrobot.greendao.annotation.Entity;
+import org.greenrobot.greendao.annotation.Id;
+import org.greenrobot.greendao.annotation.Generated;
+
 /**
  * 作者：Rance on 2016/12/14 14:13
  * 邮箱：rance935@163.com
  */
+@Entity
 public class MessageInfo {
+    @Id
+    private String id;
     private int type;
     private String content;
     private String filepath;
     private int sendState;
-    private String time;
+    private long time;
     private String header;
     private String imageUrl;
     private long voiceTime;
-    private String msgId;
+
+    @Generated(hash = 885927396)
+    public MessageInfo(String id, int type, String content, String filepath,
+            int sendState, long time, String header, String imageUrl,
+            long voiceTime) {
+        this.id = id;
+        this.type = type;
+        this.content = content;
+        this.filepath = filepath;
+        this.sendState = sendState;
+        this.time = time;
+        this.header = header;
+        this.imageUrl = imageUrl;
+        this.voiceTime = voiceTime;
+    }
+
+    @Generated(hash = 1292770546)
+    public MessageInfo() {
+    }
 
     public int getType() {
         return type;
@@ -47,11 +72,11 @@ public class MessageInfo {
         this.sendState = sendState;
     }
 
-    public String getTime() {
+    public long getTime() {
         return time;
     }
 
-    public void setTime(String time) {
+    public void setTime(long time) {
         this.time = time;
     }
 
@@ -79,12 +104,15 @@ public class MessageInfo {
         this.voiceTime = voiceTime;
     }
 
-    public String getMsgId() {
-        return msgId;
+    public String getId() {
+        if (id == null) {
+            id = String.valueOf(toString().hashCode());
+        }
+        return id;
     }
 
-    public void setMsgId(String msgId) {
-        this.msgId = msgId;
+    public void setId(String id) {
+        this.id = id;
     }
 
     @Override
@@ -98,7 +126,7 @@ public class MessageInfo {
                 ", header='" + header + '\'' +
                 ", imageUrl='" + imageUrl + '\'' +
                 ", voiceTime=" + voiceTime +
-                ", msgId='" + msgId + '\'' +
+                ", id='" + id + '\'' +
                 '}';
     }
 }
